@@ -7,6 +7,12 @@ final class AudioRecorderService {
     private(set) var isRecording = false
     private(set) var duration: TimeInterval = 0
 
+    /// ストリーミング認識用: 音声バッファをリアルタイムで転送するコールバック
+    var onAudioBuffer: ((AVAudioPCMBuffer) -> Void)?
+
+    /// false にするとWAVファイル書き込みをスキップ（ストリーミング時）
+    var writeToFile: Bool = true
+
     private let engine = AVAudioEngine()
     private var audioFile: AVAudioFile?
     private var tempFileURL: URL?
@@ -19,51 +25,80 @@ final class AudioRecorderService {
     func start() throws {
         guard !isRecording else { return }
 
-        let tempDir = FileManager.default.temporaryDirectory
-        let filename = "voicenote_\(Int(Date().timeIntervalSince1970)).wav"
-        let url = tempDir.appendingPathComponent(filename)
-        tempFileURL = url
+        // ファイルベース時のみWAVファイルを作成
+        if writeToFile {
+            let tempDir = FileManager.default.temporaryDirectory
+            let filename = "voicenote_\(Int(Date().timeIntervalSince1970)).wav"
+            let url = tempDir.appendingPathComponent(filename)
+            tempFileURL = url
 
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: sampleRate,
-            channels: channels,
-            interleaved: false
-        )!
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: sampleRate,
+                channels: channels,
+                interleaved: false
+            )!
 
-        audioFile = try AVAudioFile(
-            forWriting: url,
-            settings: format.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
+            audioFile = try AVAudioFile(
+                forWriting: url,
+                settings: format.settings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            )
+        } else {
+            tempFileURL = nil
+            audioFile = nil
+        }
 
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
-        guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
-            throw AudioRecorderError.converterFailed
+        // ファイルベース用の変換器（writeToFile時のみ使用）
+        let converter: AVAudioConverter?
+        let outputFormat: AVAudioFormat?
+        if writeToFile {
+            let fmt = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: sampleRate,
+                channels: channels,
+                interleaved: false
+            )!
+            outputFormat = fmt
+            converter = AVAudioConverter(from: inputFormat, to: fmt)
+            guard converter != nil else {
+                throw AudioRecorderError.converterFailed
+            }
+        } else {
+            converter = nil
+            outputFormat = nil
         }
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self, let audioFile = self.audioFile else { return }
+            guard let self else { return }
 
-            let ratio = self.sampleRate / inputFormat.sampleRate
-            let outputFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+            // ストリーミング: ネイティブフォーマットのバッファをそのまま転送（軽い処理のみ）
+            self.onAudioBuffer?(buffer)
 
-            guard let convertedBuffer = AVAudioPCMBuffer(
-                pcmFormat: format,
-                frameCapacity: outputFrameCount
-            ) else { return }
+            // ファイルベース: 16kHz mono に変換して書き込み
+            if self.writeToFile, let audioFile = self.audioFile,
+               let converter, let outputFormat {
+                let ratio = self.sampleRate / inputFormat.sampleRate
+                let outputFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
 
-            var error: NSError?
-            let status = converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
-                outStatus.pointee = .haveData
-                return buffer
-            }
+                guard let convertedBuffer = AVAudioPCMBuffer(
+                    pcmFormat: outputFormat,
+                    frameCapacity: outputFrameCount
+                ) else { return }
 
-            if status == .haveData || status == .inputRanDry {
-                try? audioFile.write(from: convertedBuffer)
+                var error: NSError?
+                let status = converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
+                    outStatus.pointee = .haveData
+                    return buffer
+                }
+
+                if status == .haveData || status == .inputRanDry {
+                    try? audioFile.write(from: convertedBuffer)
+                }
             }
         }
 

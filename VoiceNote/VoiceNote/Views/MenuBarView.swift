@@ -7,7 +7,19 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
 
-            // MARK: - 録音
+            // MARK: - モード表示（常時表示）
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(appState.recordingMode == .bridge ? Color.blue : Color.green)
+                    .frame(width: 8, height: 8)
+                Text(modeDisplayText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+
+            // MARK: - 録音ボタン
 
             Button {
                 appState.toggleRecording()
@@ -21,41 +33,61 @@ struct MenuBarView: View {
             .keyboardShortcut("r", modifiers: .command)
             .disabled(appState.isProcessing)
 
+            // MARK: - リアルタイム書き起こし（録音中+ストリーミング時のみ）
+
+            if appState.isRecording && !appState.liveTranscription.isEmpty {
+                HStack(alignment: .top, spacing: 4) {
+                    Image(systemName: "text.bubble")
+                        .foregroundStyle(.blue)
+                        .font(.caption)
+                    Text(appState.liveTranscription)
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(3)
+                }
+                .padding(.vertical, 2)
+            }
+
             Divider()
 
-            // MARK: - Bridge Send
+            // MARK: - モード切替
 
             Button {
-                appState.startBridgeSend()
+                appState.toggleBridgeMode()
             } label: {
                 HStack {
-                    Image(systemName: "arrow.right.circle")
-                    Text("Bridge Send")
+                    Image(systemName: appState.recordingMode == .bridge
+                        ? "arrow.right.circle.fill" : "arrow.right.circle")
+                    Text(appState.recordingMode == .bridge ? "通常モードに戻す" : "Bridgeモードに切替")
                 }
             }
-            .disabled(appState.isProcessing)
+            .disabled(appState.isRecording || appState.isProcessing)
 
-            // MARK: - プリセット切替
+            // MARK: - プリセット（Bridgeモード時のみ）
 
-            Menu {
-                ForEach(BridgePreset.allCases) { preset in
-                    Button {
-                        appState.currentPreset = preset
-                    } label: {
-                        HStack {
-                            Text(preset.displayName)
-                            if preset == appState.currentPreset {
-                                Image(systemName: "checkmark")
+            if appState.recordingMode == .bridge {
+                Menu {
+                    ForEach(BridgePreset.allCases) { preset in
+                        Button {
+                            appState.currentPreset = preset
+                        } label: {
+                            HStack {
+                                Text(preset.displayName)
+                                if preset == appState.currentPreset {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "text.badge.checkmark")
-                    Text("プリセット: \(appState.currentPreset.displayName)")
+                } label: {
+                    HStack {
+                        Image(systemName: "text.badge.checkmark")
+                        Text("プリセット: \(appState.currentPreset.displayName)")
+                    }
                 }
             }
+
+            Divider()
 
             // MARK: - Quick Translate
 
@@ -175,10 +207,23 @@ struct MenuBarView: View {
         .padding(4)
     }
 
+    // MARK: - Computed Properties
+
+    private var modeDisplayText: String {
+        switch appState.recordingMode {
+        case .normal:
+            return "通常モード"
+        case .bridge:
+            return "Bridgeモード (\(appState.currentPreset.displayName))"
+        }
+    }
+
     private var buttonTitle: String {
         if appState.isProcessing { return "処理中..." }
         if appState.isRecording { return "録音停止 (右⌘×2)" }
-        return "録音開始 (右⌘×2)"
+        return appState.recordingMode == .bridge
+            ? "録音開始 → 英語翻訳"
+            : "録音開始 (右⌘×2)"
     }
 
     private var statusIcon: String {

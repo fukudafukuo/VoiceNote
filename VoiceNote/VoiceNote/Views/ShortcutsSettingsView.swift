@@ -10,7 +10,7 @@ struct ShortcutsSettingsView: View {
         Form {
             Section("ショートカット設定") {
                 KeyboardShortcuts.Recorder("録音トグル", name: .toggleRecording)
-                KeyboardShortcuts.Recorder("Bridge Send", name: .bridgeSend)
+                KeyboardShortcuts.Recorder("Bridgeモード切替", name: .toggleBridgeMode)
                 KeyboardShortcuts.Recorder("Quick Translate", name: .quickTranslate)
                 KeyboardShortcuts.Recorder("プリセット切替", name: .cyclePreset)
                 KeyboardShortcuts.Recorder("オーバーレイ表示/非表示", name: .toggleOverlay)
@@ -28,7 +28,7 @@ struct ShortcutsSettingsView: View {
                 Button("すべてリセット") {
                     KeyboardShortcuts.reset([
                         .toggleRecording,
-                        .bridgeSend,
+                        .toggleBridgeMode,
                         .quickTranslate,
                         .cyclePreset,
                         .toggleOverlay,

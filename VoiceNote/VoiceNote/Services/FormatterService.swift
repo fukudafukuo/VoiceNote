@@ -78,12 +78,12 @@ final class GeminiFormatter {
         \(englishText)
         """
 
-        return try await callGeminiAPI(systemInstruction: sysPrompt, userPrompt: userPrompt)
+        return try await callGeminiAPI(systemInstruction: sysPrompt, userPrompt: userPrompt, timeout: 10)
     }
 
     // MARK: - Private: Gemini API 共通呼び出し
 
-    private func callGeminiAPI(systemInstruction: String, userPrompt: String) async throws -> String {
+    private func callGeminiAPI(systemInstruction: String, userPrompt: String, timeout: TimeInterval = 30) async throws -> String {
         let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else {
             throw FormatterError.invalidURL
@@ -92,7 +92,7 @@ final class GeminiFormatter {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30
+        request.timeoutInterval = timeout
 
         let body: [String: Any] = [
             "system_instruction": [

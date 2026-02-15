@@ -4,7 +4,7 @@ import Foundation
 final class TokenProtectionService {
 
     /// 保護パターン定義（優先順位順。先に定義されたものが優先される）
-    private let patterns: [(TokenType, String)] = [
+    private static let patternDefinitions: [(TokenType, String)] = [
         // コードブロック（```...```）- 最優先
         (.codeBlock,  "```[\\s\\S]*?```"),
         // インラインコード（`...`）
@@ -27,6 +27,16 @@ final class TokenProtectionService {
         (.number,     "\\b\\d+(?:[,.]\\d+)*\\s*(?:GB|MB|KB|TB|ms|sec|min|px|em|rem|%|秒|分|時間|日|件|個|回|人|万|億)\\b"),
     ]
 
+    /// 事前コンパイル済み正規表現（init時に1回だけコンパイル）
+    private let compiledPatterns: [(TokenType, NSRegularExpression)]
+
+    init() {
+        compiledPatterns = Self.patternDefinitions.compactMap { (type, pattern) in
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+            return (type, regex)
+        }
+    }
+
     /// テキスト内のトークンをプレースホルダに置換
     /// - Returns: (プレースホルダ化されたテキスト, 保護されたトークン一覧)
     func protect(_ text: String) -> (text: String, tokens: [ProtectedToken]) {
@@ -35,8 +45,7 @@ final class TokenProtectionService {
         // 既に保護済みの範囲を追跡（二重保護の防止）
         var protectedRanges: [Range<String.Index>] = []
 
-        for (type, pattern) in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+        for (type, regex) in compiledPatterns {
             let nsRange = NSRange(result.startIndex..., in: result)
             let matches = regex.matches(in: result, range: nsRange)
 

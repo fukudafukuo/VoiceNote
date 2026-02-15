@@ -2,6 +2,14 @@ import Foundation
 import SwiftUI
 import KeyboardShortcuts
 
+// MARK: - 録音モード
+
+/// 通常（書き起こしのみ）と Bridge（書き起こし→英語翻訳）を永続トグルで切り替え
+enum RecordingMode: String {
+    case normal
+    case bridge
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -13,8 +21,15 @@ final class AppState {
     var isModelLoaded = false
     var statusMessage = "待機中"
 
-    /// Bridge Sendのワンショットフラグ（録音停止後にBridgeパイプラインへ流す）
-    var bridgeModeOneShot = false
+    /// 現在の録音モード（UserDefaults で永続化）
+    var recordingMode: RecordingMode {
+        get {
+            RecordingMode(rawValue: UserDefaults.standard.string(forKey: "recordingMode") ?? "normal") ?? .normal
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "recordingMode")
+        }
+    }
 
     /// 現在のBridgeプリセット
     var currentPreset: BridgePreset {
@@ -25,6 +40,17 @@ final class AppState {
             UserDefaults.standard.set(newValue.rawValue, forKey: "defaultPreset")
         }
     }
+
+    /// ストリーミング認識のリアルタイムテキスト（メニューバー・オーバーレイで表示）
+    var liveTranscription: String {
+        appleSpeechService.partialResult
+    }
+
+    /// 現在ストリーミング認識中かどうか（録音開始時に決定、停止時はこれを参照）
+    private var isStreaming = false
+
+    /// 直近の Bridge 翻訳タスク（キャンセル伝播用）
+    private var currentBridgeTask: Task<Void, Never>?
 
     // MARK: - UserDefaults設定
 
@@ -56,6 +82,12 @@ final class AppState {
     var appProfilesEnabled: Bool {
         get { UserDefaults.standard.object(forKey: "appProfilesEnabled") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "appProfilesEnabled") }
+    }
+
+    @ObservationIgnored
+    var useGeminiStyleAdjust: Bool {
+        get { UserDefaults.standard.object(forKey: "useGeminiStyleAdjust") as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: "useGeminiStyleAdjust") }
     }
 
     @ObservationIgnored
@@ -124,6 +156,7 @@ final class AppState {
     var menuBarIcon: String {
         if isRecording { return "record.circle.fill" }
         if isProcessing { return "hourglass" }
+        if recordingMode == .bridge { return "globe" }
         return "mic.fill"
     }
 
@@ -140,9 +173,21 @@ final class AppState {
         }
     }
 
+    // MARK: - モード切替
+
+    /// 通常 ⇔ Bridge モードをトグル
+    func toggleBridgeMode() {
+        guard !isRecording, !isProcessing else { return }
+        recordingMode = (recordingMode == .normal) ? .bridge : .normal
+        updateStatus(recordingMode == .bridge
+            ? "Bridgeモード: 録音 → 英語翻訳 (\(currentPreset.displayName))"
+            : "通常モード: 録音 → 書き起こし")
+    }
+
     // MARK: - 録音トグル
 
     func toggleRecording() {
+        print("[VN] toggleRecording: isRecording=\(isRecording), isProcessing=\(isProcessing)")
         if isProcessing {
             updateStatus("処理中です。しばらくお待ちください。")
             return
@@ -156,40 +201,105 @@ final class AppState {
     }
 
     private func startRecording() {
+        // 二重起動ガード
+        guard !isRecording, !isProcessing else {
+            print("[VN] startRecording: guarded out (isRecording=\(isRecording), isProcessing=\(isProcessing))")
+            return
+        }
+
         do {
+            let engine = UserDefaults.standard.string(forKey: "recognitionEngine") ?? "whisper"
+            print("[VN] startRecording: engine=\(engine)")
+
+            if engine == "apple" {
+                // ストリーミングモード: WAVファイル不要
+                audioRecorder.writeToFile = false
+                audioRecorder.onAudioBuffer = { [weak self] buffer in
+                    self?.appleSpeechService.appendBuffer(buffer)
+                }
+                isStreaming = true
+
+                // ストリーミング認識を開始
+                Task {
+                    do {
+                        try await appleSpeechService.startStreaming()
+                    } catch {
+                        updateStatus("ストリーミング開始エラー: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                // ファイルベースモード（WhisperKit）
+                audioRecorder.writeToFile = true
+                audioRecorder.onAudioBuffer = nil
+                isStreaming = false
+            }
+
             try audioRecorder.start()
             isRecording = true
+            print("[VN] startRecording: success, isRecording=\(isRecording)")
             updateStatus("録音中...")
+
+            // Bridge + ストリーミング時: オーバーレイを録音中モードで即表示
+            if recordingMode == .bridge && isStreaming {
+                overlayState.liveText = ""
+                overlayState.mode = .recording
+                showOverlay()
+            }
+
         } catch {
             updateStatus("録音開始エラー: \(error.localizedDescription)")
+            isStreaming = false
         }
     }
 
     private func stopRecording() {
+        print("[VN] stopRecording: isStreaming=\(isStreaming), mode=\(recordingMode)")
         isRecording = false
+        isProcessing = true
         updateStatus("録音停止、処理開始...")
 
-        guard let audioURL = audioRecorder.stop() else {
-            updateStatus("録音データがありません")
-            return
-        }
+        let audioURL = audioRecorder.stop()
+        let isBridge = (recordingMode == .bridge)
 
-        isProcessing = true
+        if isStreaming {
+            // ストリーミング: stopStreaming() で最終テキスト取得（audioURL は nil）
+            Task {
+                do {
+                    updateStatus("認識確定中...")
+                    let finalText = try await appleSpeechService.stopStreaming()
+                    print("[VN] stopRecording: finalText='\(finalText.prefix(50))', isBridge=\(isBridge)")
+                    updateStatus(appleSpeechService.loadingProgress)
 
-        // Bridge Sendモードかどうかでパイプラインを分岐
-        let isBridgeMode = bridgeModeOneShot
-        bridgeModeOneShot = false
+                    if isBridge {
+                        processTextBridge(text: finalText)
+                    } else {
+                        await processText(text: finalText)
+                    }
+                } catch {
+                    print("[VN] stopRecording: streaming error: \(error)")
+                    updateStatus("認識エラー: \(error.localizedDescription)")
+                    isProcessing = false
+                }
+            }
+        } else {
+            // ファイルベース: audioURL を使って書き起こし
+            guard let audioURL else {
+                updateStatus("録音データがありません")
+                isProcessing = false
+                return
+            }
 
-        Task {
-            if isBridgeMode {
-                await processAudioBridge(audioURL: audioURL)
-            } else {
-                await processAudio(audioURL: audioURL)
+            Task {
+                if isBridge {
+                    await processAudioBridge(audioURL: audioURL)
+                } else {
+                    await processAudio(audioURL: audioURL)
+                }
             }
         }
     }
 
-    // MARK: - 書き起こし共通
+    // MARK: - 書き起こし共通（ファイルベース用）
 
     /// 音声ファイルを書き起こす（エンジン設定に応じて切り替え）
     private func transcribe(audioURL: URL) async throws -> String {
@@ -212,7 +322,7 @@ final class AppState {
         }
     }
 
-    // MARK: - v1.0 通常パイプライン
+    // MARK: - v1.0 通常パイプライン（ファイルベース入口）
 
     private func processAudio(audioURL: URL) async {
         defer {
@@ -222,115 +332,172 @@ final class AppState {
 
         do {
             let rawText = try await transcribe(audioURL: audioURL)
-
-            guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                updateStatus("音声が検出されませんでした")
-                return
-            }
-
-            // 1. 音声コマンド処理
-            let processedText = voiceCommandService.process(rawText)
-
-            // 2. アプリプロファイル取得
-            let (profile, appName) = appProfileService.getProfile()
-            if !appName.isEmpty {
-                updateStatus("出力先: \(profile.name)")
-            }
-
-            // 3. テキスト整形（Geminiは長文のみ）
-            let formatted: String
-            let useGemini = geminiFormatter != nil && processedText.count >= 100
-
-            if useGemini {
-                updateStatus("テキストを整形中...")
-                do {
-                    formatted = try await geminiFormatter!.format(processedText)
-                } catch {
-                    formatted = offlineFormatter.format(processedText, formatMode: profile.formatMode)
-                }
-            } else {
-                formatted = offlineFormatter.format(processedText, formatMode: profile.formatMode)
-            }
-
-            // 4. 句読点変換（常に最後に適用）
-            let punctuated = offlineFormatter.normalizePunctuation(formatted)
-
-            let finalText = appProfileService.applyProfile(punctuated, profile: profile)
-
-            clipboardService.copyToClipboard(finalText)
-
-            if autoPaste {
-                clipboardService.pasteToActiveApp()
-                updateStatus("テキストを入力しました")
-            } else {
-                updateStatus("クリップボードにコピーしました")
-            }
-
-            if saveMarkdown {
-                saveMarkdownFile(finalText)
-            }
-
-            updateStatus("待機中")
-
+            await processTextCommon(text: rawText)
         } catch {
             updateStatus("エラー: \(error.localizedDescription)")
         }
     }
 
-    // MARK: - Bridge Send パイプライン
+    // MARK: - 通常パイプライン（テキスト入口 — ストリーミング/ファイルベース共通）
 
-    /// Bridge Send: 録音 → 書き起こし → 英語翻訳 → オーバーレイ表示
+    /// ストリーミングまたはファイルベースから書き起こされたテキストを通常パイプラインで処理
+    private func processText(text: String) async {
+        defer { isProcessing = false }
+        await processTextCommon(text: text)
+    }
+
+    /// 通常パイプラインの共通処理（voice commands → format → paste → save）
+    private func processTextCommon(text: String) async {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            updateStatus("音声が検出されませんでした")
+            return
+        }
+
+        // 1. 音声コマンド処理
+        let processedText = voiceCommandService.process(text)
+
+        // 2. アプリプロファイル取得
+        let (profile, appName) = appProfileService.getProfile()
+        if !appName.isEmpty {
+            updateStatus("出力先: \(profile.name)")
+        }
+
+        // 3. テキスト整形（Geminiは長文のみ）
+        let formatted: String
+        let useGemini = geminiFormatter != nil && processedText.count >= 100
+
+        if useGemini {
+            updateStatus("テキストを整形中...")
+            do {
+                formatted = try await geminiFormatter!.format(processedText)
+            } catch {
+                formatted = offlineFormatter.format(processedText, formatMode: profile.formatMode)
+            }
+        } else {
+            formatted = offlineFormatter.format(processedText, formatMode: profile.formatMode)
+        }
+
+        // 4. 句読点変換（常に最後に適用）
+        let punctuated = offlineFormatter.normalizePunctuation(formatted)
+
+        let finalText = appProfileService.applyProfile(punctuated, profile: profile)
+
+        clipboardService.copyToClipboard(finalText)
+
+        if autoPaste {
+            clipboardService.pasteToActiveApp()
+            updateStatus("テキストを入力しました")
+        } else {
+            updateStatus("クリップボードにコピーしました")
+        }
+
+        if saveMarkdown {
+            saveMarkdownFile(finalText)
+        }
+
+        updateStatus("待機中")
+    }
+
+    // MARK: - Bridge Send パイプライン（ファイルベース入口）
+
     private func processAudioBridge(audioURL: URL) async {
         defer {
-            isProcessing = false
             AudioRecorderService.cleanup(audioURL)
         }
 
         do {
-            // 1. 書き起こし
             updateStatus("書き起こし中...")
             let rawText = try await transcribe(audioURL: audioURL)
-
-            guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                updateStatus("音声が検出されませんでした")
-                return
-            }
-
-            // 2. 整形（オフラインでフィラー除去のみ）
-            let cleaned = offlineFormatter.format(rawText)
-
-            // オーバーレイにソーステキストを表示
-            overlayState.sourceText = cleaned
-            overlayState.outputText = ""
-            overlayState.mode = .bridgeSend
-            showOverlay()
-
-            // 3. Bridge Sendパイプライン実行
-            updateStatus("翻訳中...")
-            let preset = currentPreset
-            let result = try await bridgeSendService.process(cleaned, preset: preset)
-
-            // 4. オーバーレイに結果を表示
-            overlayState.outputText = result
-            updateStatus("翻訳完了 — オーバーレイで確認してください")
-
+            // processTextBridgeCommon 内部のTaskが isProcessing を管理する
+            processTextBridgeCommon(text: rawText)
         } catch {
-            overlayState.outputText = "エラー: \(error.localizedDescription)"
+            overlayState.errorMessage = error.localizedDescription
             updateStatus("Bridge Sendエラー: \(error.localizedDescription)")
+            isProcessing = false
         }
     }
 
-    /// Bridge Send をワンショットで開始（ショートカットから呼ばれる）
-    func startBridgeSend() {
-        if isRecording {
-            // 録音中ならフラグを立てて停止 → Bridgeパイプラインへ
-            bridgeModeOneShot = true
-            stopRecording()
-        } else if !isProcessing {
-            // 未録音なら録音開始 + Bridgeフラグ
-            bridgeModeOneShot = true
-            startRecording()
+    // MARK: - Bridge Send パイプライン（テキスト入口 — ストリーミング/ファイルベース共通）
+
+    /// ストリーミングまたはファイルベースから書き起こされたテキストを Bridge パイプラインで処理
+    private func processTextBridge(text: String) {
+        processTextBridgeCommon(text: text)
+    }
+
+    /// Bridge パイプラインの共通処理（format → overlay → bridge send）
+    /// Taskを生成して非同期で翻訳を実行。isProcessing の解除はTask内で行う。
+    private func processTextBridgeCommon(text: String) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            updateStatus("音声が検出されませんでした")
+            isProcessing = false
+            return
         }
+
+        // 前の翻訳タスクをキャンセル
+        currentBridgeTask?.cancel()
+
+        // 1. 整形（オフラインでフィラー除去のみ）
+        let cleaned = offlineFormatter.format(text)
+
+        // 2. オーバーレイにソーステキストを表示
+        overlayState.sourceText = cleaned
+        overlayState.outputText = ""
+        overlayState.errorMessage = nil
+        overlayState.mode = .bridgeSend
+        overlayState.isTranslating = true
+        overlayState.isRefining = false
+        overlayState.userHasEdited = false
+        showOverlay()
+
+        // 3. Bridge Sendパイプライン実行（2フェーズ: 中間結果→文体調整）
+        let preset = currentPreset
+        let skipStyle = !useGeminiStyleAdjust
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.isProcessing = false }
+
+            do {
+                let result = try await self.bridgeSendService.process(
+                    cleaned,
+                    preset: preset,
+                    skipStyleAdjust: skipStyle,
+                    onProgress: { [weak self] stage in
+                        self?.overlayState.processingStage = stage
+                        self?.updateStatus(stage)
+                    },
+                    onIntermediateResult: { [weak self] intermediateText in
+                        guard let self else { return }
+                        self.overlayState.outputText = intermediateText
+                        self.overlayState.isTranslating = false
+                        self.overlayState.processingStage = ""
+                        if !skipStyle && self.geminiFormatter != nil {
+                            self.overlayState.isRefining = true
+                        }
+                    }
+                )
+
+                // Gemini完了後: ユーザーが編集していなければ差し替え
+                if !self.overlayState.userHasEdited {
+                    self.overlayState.outputText = result
+                }
+                self.overlayState.isTranslating = false
+                self.overlayState.isRefining = false
+                self.overlayState.processingStage = ""
+                self.updateStatus("翻訳完了 — オーバーレイで確認してください")
+
+            } catch is CancellationError {
+                // キャンセルされた場合は何もしない
+            } catch {
+                self.overlayState.errorMessage = error.localizedDescription
+                self.overlayState.isTranslating = false
+                self.overlayState.isRefining = false
+                self.overlayState.processingStage = ""
+                self.updateStatus("Bridge Sendエラー: \(error.localizedDescription)")
+            }
+        }
+
+        currentBridgeTask = task
     }
 
     // MARK: - Quick Translate
@@ -355,19 +522,118 @@ final class AppState {
                 // 2. オーバーレイにソーステキストを表示
                 overlayState.sourceText = selectedText
                 overlayState.outputText = ""
+                overlayState.errorMessage = nil
                 overlayState.mode = .quickTranslate
+                overlayState.isTranslating = true
                 showOverlay()
 
                 // 3. 翻訳実行
                 updateStatus("翻訳中...")
+                overlayState.processingStage = "翻訳中..."
                 let translated = try await quickTranslateService.translate(selectedText)
 
                 // 4. オーバーレイに結果を表示
                 overlayState.outputText = translated
+                overlayState.isTranslating = false
+                overlayState.processingStage = ""
                 updateStatus("翻訳完了")
 
             } catch {
+                overlayState.errorMessage = error.localizedDescription
+                overlayState.isTranslating = false
+                overlayState.processingStage = ""
                 updateStatus("Quick Translate エラー: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - 再試行
+
+    /// Bridge Send の再試行（前回のソーステキストから再翻訳）
+    func retryBridgeSend() {
+        let text = overlayState.sourceText
+        guard !text.isEmpty, !isProcessing else { return }
+        isProcessing = true
+        overlayState.errorMessage = nil
+        overlayState.isTranslating = true
+        overlayState.isRefining = false
+        overlayState.userHasEdited = false
+        overlayState.processingStage = ""
+
+        // 前の翻訳タスクをキャンセル
+        currentBridgeTask?.cancel()
+
+        let preset = currentPreset
+        let skipStyle = !useGeminiStyleAdjust
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.isProcessing = false }
+
+            do {
+                let result = try await self.bridgeSendService.process(
+                    text,
+                    preset: preset,
+                    skipStyleAdjust: skipStyle,
+                    onProgress: { [weak self] stage in
+                        self?.overlayState.processingStage = stage
+                        self?.updateStatus(stage)
+                    },
+                    onIntermediateResult: { [weak self] intermediateText in
+                        guard let self else { return }
+                        self.overlayState.outputText = intermediateText
+                        self.overlayState.isTranslating = false
+                        self.overlayState.processingStage = ""
+                        if !skipStyle && self.geminiFormatter != nil {
+                            self.overlayState.isRefining = true
+                        }
+                    }
+                )
+
+                if !self.overlayState.userHasEdited {
+                    self.overlayState.outputText = result
+                }
+                self.overlayState.isTranslating = false
+                self.overlayState.isRefining = false
+                self.overlayState.processingStage = ""
+                self.updateStatus("翻訳完了 — オーバーレイで確認してください")
+            } catch is CancellationError {
+                // キャンセル
+            } catch {
+                self.overlayState.errorMessage = error.localizedDescription
+                self.overlayState.isTranslating = false
+                self.overlayState.isRefining = false
+                self.overlayState.processingStage = ""
+                self.updateStatus("再試行エラー: \(error.localizedDescription)")
+            }
+        }
+
+        currentBridgeTask = task
+    }
+
+    /// Quick Translate の再試行（前回のソーステキストから再翻訳）
+    func retryQuickTranslate() {
+        let text = overlayState.sourceText
+        guard !text.isEmpty, !isProcessing else { return }
+        isProcessing = true
+        overlayState.errorMessage = nil
+        overlayState.isTranslating = true
+        overlayState.processingStage = "翻訳中..."
+
+        Task {
+            defer { isProcessing = false }
+
+            do {
+                let translated = try await quickTranslateService.translate(text)
+                overlayState.outputText = translated
+                overlayState.isTranslating = false
+                overlayState.processingStage = ""
+                updateStatus("翻訳完了")
+            } catch {
+                overlayState.errorMessage = error.localizedDescription
+                overlayState.isTranslating = false
+                overlayState.processingStage = ""
+                updateStatus("再試行エラー: \(error.localizedDescription)")
             }
         }
     }
@@ -434,9 +700,9 @@ final class AppState {
             }
         }
 
-        KeyboardShortcuts.onKeyUp(for: .bridgeSend) { [weak self] in
+        KeyboardShortcuts.onKeyUp(for: .toggleBridgeMode) { [weak self] in
             Task { @MainActor in
-                self?.startBridgeSend()
+                self?.toggleBridgeMode()
             }
         }
 
@@ -478,21 +744,30 @@ final class AppState {
 
     func preloadModel() {
         let engine = UserDefaults.standard.string(forKey: "recognitionEngine") ?? "whisper"
+        print("[VN] preloadModel: engine=\(engine)")
 
         Task {
             if engine == "apple" {
                 let authorized = await appleSpeechService.requestAuthorization()
                 isModelLoaded = authorized
+                print("[VN] preloadModel: apple auth=\(authorized)")
                 updateStatus(authorized ? "待機中（Apple音声認識）" : "音声認識の権限がありません")
             } else {
                 do {
                     try await whisperService.loadModel()
                     isModelLoaded = true
+                    print("[VN] preloadModel: whisper loaded")
                     updateStatus("待機中")
                 } catch {
+                    print("[VN] preloadModel: whisper error: \(error)")
                     updateStatus("モデル読み込みエラー: \(error.localizedDescription)")
                 }
             }
+
+            // 翻訳セッションのウォームアップ（バックグラウンドで）
+            print("[VN] preloadModel: starting warmUp (isSessionAvailable=\(translationService.isSessionAvailable), onRequestAdded=\(translationService.onRequestAdded != nil))")
+            await translationService.warmUp()
+            print("[VN] preloadModel: warmUp done")
         }
     }
 

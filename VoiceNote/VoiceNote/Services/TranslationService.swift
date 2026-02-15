@@ -8,33 +8,92 @@ enum TranslationDirection {
     case auto
 }
 
-/// 翻訳サービス - 翻訳要求の窓口（セッション自体は TranslationSessionHost が保持）
+/// 翻訳リクエスト（TranslationSessionHost に渡すデータ）
+struct TranslationRequest {
+    let id: UUID
+    let text: String
+    let sourceLang: String
+    let targetLang: String
+    let continuation: CheckedContinuation<String, Error>
+}
+
+/// 翻訳サービス - 翻訳要求の窓口
+/// TranslationSession はビュークロージャ内でのみ使用可能なため、
+/// リクエストキュー方式で .translationTask に翻訳を委譲する。
+/// タイムアウトは TranslationSessionHost 側で session.translate() を包む形で実装。
 @MainActor
 @Observable
 final class TranslationService {
 
     private(set) var isTranslating = false
 
-    /// TranslationSessionHost から設定される翻訳ハンドラ
-    /// (sourceText, sourceLang, targetLang) -> translatedText
-    var translateHandler: ((String, String, String) async throws -> String)?
+    /// 保留中の翻訳リクエスト（TranslationSessionHost が消費する）
+    var pendingRequest: TranslationRequest?
+
+    /// キャンセル済みリクエストID（二重 resume 防止用）
+    var cancelledRequestIds = Set<UUID>()
+
+    /// 翻訳リクエストが追加されたことを通知するコールバック
+    var onRequestAdded: (() -> Void)?
+
+    /// セッション再生成要求コールバック（TranslationSessionHost が設定）
+    var onSessionInvalidate: (() -> Void)?
+
+    /// セッションが利用可能か（TranslationSessionHost が設定）
+    var isSessionAvailable: Bool = false
 
     /// テキストを翻訳
-    func translate(_ text: String, direction: TranslationDirection) async throws -> String {
+    func translate(_ text: String,
+                   direction: TranslationDirection) async throws -> String {
+
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return ""
+        }
+
+        let (sourceLang, targetLang) = resolveLanguages(text: text, direction: direction)
+
+        guard isSessionAvailable else {
+            throw TranslationServiceError.sessionNotAvailable
         }
 
         isTranslating = true
         defer { isTranslating = false }
 
-        let (sourceLang, targetLang) = resolveLanguages(text: text, direction: direction)
+        let requestId = UUID()
 
-        guard let handler = translateHandler else {
-            throw TranslationServiceError.sessionNotAvailable
+        return try await withCheckedThrowingContinuation { continuation in
+            let request = TranslationRequest(
+                id: requestId,
+                text: text,
+                sourceLang: sourceLang,
+                targetLang: targetLang,
+                continuation: continuation
+            )
+
+            // 既存のリクエストがある場合はキャンセル扱い
+            if let existing = pendingRequest {
+                pendingRequest = nil
+                cancelledRequestIds.insert(existing.id)
+                existing.continuation.resume(throwing: CancellationError())
+            }
+
+            pendingRequest = request
+
+            // TranslationSessionHost に通知 → .translationTask 再トリガー
+            if let onRequestAdded {
+                onRequestAdded()
+            } else {
+                // コールバック未設定（TranslationSessionHost 未初期化）→ エラーで返す
+                pendingRequest = nil
+                continuation.resume(throwing: TranslationServiceError.sessionNotAvailable)
+            }
         }
+    }
 
-        return try await handler(text, sourceLang, targetLang)
+    /// 翻訳セッションをウォームアップ（起動時に呼ぶ）
+    func warmUp() async {
+        guard isSessionAvailable, onRequestAdded != nil else { return }
+        _ = try? await translate("テスト", direction: .jaToEn)
     }
 
     /// 言語を自動検出
@@ -62,13 +121,16 @@ final class TranslationService {
     }
 }
 
-enum TranslationServiceError: LocalizedError {
+enum TranslationServiceError: LocalizedError, Equatable {
     case sessionNotAvailable
+    case timeout
 
     var errorDescription: String? {
         switch self {
         case .sessionNotAvailable:
             return "翻訳セッションが利用できません。macOS 15以降が必要です。"
+        case .timeout:
+            return "翻訳がタイムアウトしました（10秒）。再試行してください。"
         }
     }
 }

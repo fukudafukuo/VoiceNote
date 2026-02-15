@@ -1,0 +1,26 @@
+# Build
+build/
+dist/
+*.dmg
+DerivedData/
+
+# Xcode
+*.xcuserdata/
+*.xcworkspace/
+xcuserdata/
+
+# Python (旧バージョンの残り)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# macOS
+.DS_Store
+*.swp
+
+# WhisperKit models (大容量)
+models/
+
+# Secrets
+.env

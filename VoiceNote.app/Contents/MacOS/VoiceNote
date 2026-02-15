@@ -1,0 +1,4 @@
+#!/bin/bash
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+source "$HOME/.voicenote/venv/bin/activate"
+exec arch -arm64 python3 "$HOME/voicenote/main.py" >> /tmp/voicenote.log 2>> /tmp/voicenote.err

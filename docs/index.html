@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceNote v2.1 ãªãªã¼ã¹ â macOS ã§ãå£°ããæå¼·ã®å¥åææ®µã« | Whisperé³å£°å¥å & æ¥è±ç¿»è¨³ã¢ããª</title>
+<meta name="description" content="VoiceNote ã¯ macOS ã¡ãã¥ã¼ãã¼å¸¸é§ã®é³å£°å¥åã¢ããªãWhisper Large V3 Turbo ã«ãããªã³ããã¤ã¹é«ç²¾åº¦æ¸ãèµ·ãããBridge Send ã«ããæ¥âè±ãªã¢ã«ã¿ã¤ã ç¿»è¨³ãQuick Translateãé³å£°ã³ãã³ãã§Markdownå¥åãGemini APIé£æºãªã©å¨æ©è½ãç´¹ä»ã">
+<meta name="keywords" content="VoiceNote, macOS, é³å£°å¥å, Whisper, WhisperKit, Apple Silicon, é³å£°èªè­, ç¿»è¨³, Bridge Send, Quick Translate, Markdown, Gemini API, ãªã³ããã¤ã¹, ã¡ãã¥ã¼ãã¼, åäººéçº">
+<meta property="og:title" content="VoiceNote v2.1 â macOS ã§ãå£°ããæå¼·ã®å¥åææ®µã«">
+<meta property="og:description" content="ã·ã§ã¼ãã«ããã­ã¼ä¸çºã§é²é³âæ¸ãèµ·ããâèªåãã¼ã¹ããWhisper ãªã³ããã¤ã¹èªè­ã§é«ç²¾åº¦ãæ¥âè±ç¿»è¨³éä¿¡ãé¸æãã­ã¹ãç¿»è¨³ãé³å£°Markdownå¥åã«ãå¯¾å¿ã">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VoiceNote v2.1 â macOS ã§ãå£°ããæå¼·ã®å¥åææ®µã«">
+<meta name="twitter:description" content="ã·ã§ã¼ãã«ããã­ã¼ä¸çºã§é²é³âæ¸ãèµ·ããâèªåãã¼ã¹ããWhisper ãªã³ããã¤ã¹èªè­ã§é«ç²¾åº¦ãÂ¥300ã§è²©å£²ä¸­ã">
+<link rel="canonical" href="https://fukudafukuo.github.io/voicenote/">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    color: #1a1a1a;
+    background: #fafafa;
+    line-height: 1.85;
+  }
+  .hero {
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #2d1b69 100%);
+    color: #fff;
+    padding: 80px 24px 60px;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 800;
+    line-height: 1.3;
+    margin-bottom: 16px;
+  }
+  .hero p {
+    font-size: 17px;
+    opacity: 0.85;
+    max-width: 600px;
+    margin: 0 auto 32px;
+  }
+  .cta-btn {
+    display: inline-block;
+    background: #ff4654;
+    color: #fff;
+    text-decoration: none;
+    padding: 14px 36px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255,70,84,0.35);
+  }
+  .price-tag {
+    display: inline-block;
+    margin-left: 12px;
+    background: rgba(255,255,255,0.2);
+    padding: 14px 24px;
+    border-radius: 8px;
+    font-size: 22px;
+    font-weight: 800;
+    vertical-align: middle;
+  }
+  article {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+  h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #2d1b69;
+  }
+  h3 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 32px 0 10px;
+    color: #2d1b69;
+  }
+  p { margin-bottom: 16px; }
+  .lead {
+    font-size: 18px;
+    color: #444;
+    border-left: 4px solid #2d1b69;
+    padding-left: 16px;
+    margin: 32px 0;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 24px 0;
+  }
+  .feature-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 24px;
+    transition: box-shadow 0.2s;
+  }
+  .feature-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .feature-card .icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .feature-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .feature-card p {
+    font-size: 14px;
+    color: #555;
+    margin: 0;
+  }
+  .use-case {
+    background: #f0eef5;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .use-case h4 {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .use-case p {
+    font-size: 15px;
+    color: #444;
+    margin: 0;
+  }
+  .warning-box {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+  }
+  .warning-box strong { color: #e65100; }
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .spec-table th, .spec-table td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 15px;
+  }
+  .spec-table th {
+    background: #f5f5f5;
+    font-weight: 600;
+    width: 30%;
+  }
+  .bottom-cta {
+    text-align: center;
+    padding: 48px 24px;
+    background: #f0eef5;
+    border-radius: 16px;
+    margin: 48px 0 0;
+  }
+  .bottom-cta h2 {
+    border: none;
+    margin-top: 0;
+  }
+  kbd {
+    background: #eee;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 13px;
+    font-family: monospace;
+  }
+  .privacy-note {
+    background: #e8f5e9;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    font-size: 15px;
+  }
+  .api-note {
+    background: #e3f2fd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    font-size: 15px;
+  }
+  code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+  }
+  footer {
+    text-align: center;
+    padding: 32px 24px;
+    color: #888;
+    font-size: 14px;
+  }
+  footer a { color: #2d1b69; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">NEW RELEASE â v2.1</div>
+  <h1>VoiceNote<br>macOS ã§ãå£°ããæå¼·ã®å¥åææ®µã«</h1>
+  <p>ã·ã§ã¼ãã«ããã­ã¼ä¸çºã§é²é³ãWhisper ãé«ç²¾åº¦ã«æ¸ãèµ·ããããã®ã¾ã¾ç¿»è¨³ãã¦è±èªã§éä¿¡ããã¹ã¦ã¡ãã¥ã¼ãã¼ããã</p>
+  <a class="cta-btn" href="https://fukudafukuo.booth.pm/items/8005996">BOOTHã§è³¼å¥ãã</a>
+  <span class="price-tag">Â¥300</span>
+</div>
+
+<article>
+
+  <p class="lead">ã­ã¼ãã¼ãã§æã¤ãããå£°ã§è©±ãã»ããéãããããªå½ããåã®ãã¨ããmacOS ã§å®ç¾ããã¢ããªãä½ãã¾ããããã®è¨äºã§ã¯ VoiceNote v2.1 ã®å¨æ©è½ãç´¹ä»ãã¾ãã</p>
+
+  <h2>VoiceNote ã¨ã¯</h2>
+  <p>VoiceNote ã¯ macOS ã®ã¡ãã¥ã¼ãã¼ã«å¸¸é§ããé³å£°å¥åã¢ããªã§ããå³âã­ã¼ã2åã¿ããããã ãã§é²é³ãå§ã¾ããè©±ããåå®¹ããã­ã¹ãã«å¤æãã¦ã¢ã¯ãã£ããªã¢ããªã«èªåãã¼ã¹ããã¾ãã</p>
+
+  <h2>2ã¤ã®èªè­ã¨ã³ã¸ã³ãåæ¿å¯è½</h2>
+  <p>VoiceNote ã«ã¯2ã¤ã®é³å£°èªè­ã¨ã³ã¸ã³ãæ­è¼ãã¦ãããç¨éã«å¿ãã¦åãæ¿ãããã¾ãã</p>
+
+  <h3>Whisperï¼é«ç²¾åº¦ã¢ã¼ãï¼</h3>
+  <p>OpenAI ã® <strong>Whisper Large V3 Turbo</strong> ã <strong>WhisperKit</strong> çµç±ã§ Apple Silicon ä¸ã«ãªã³ããã¤ã¹å®è¡ãå°éç¨èªãè±åèªãæ··ãã£ãåå®¹ãé«ãç²¾åº¦ã§èªè­ãã¾ãããã ãã¢ãã«ãå¤§ãããããå¦çã«ã¯ããæéããããã¾ããååä½¿ç¨æã«ç´3GBã®ã¢ãã«ããã¦ã³ã­ã¼ãããå¿è¦ãããã¾ããç²¾åº¦ãéè¦ãããå ´é¢ã«åãã¦ãã¾ãã</p>
+
+  <h3>Apple é³å£°èªè­ï¼é«éã¢ã¼ãï¼</h3>
+  <p>macOS åèµã®ãªã³ããã¤ã¹é³å£°èªè­ãä½¿ç¨ãã¢ãã«ã®ãã¦ã³ã­ã¼ããä¸è¦ã§ãWhisper ã«æ¯ã¹ã¦å¦çãé«éã§ããç­ãã¡ã¢ããã£ããå¥åãªã©ãéåº¦ãéè¦ãããå ´é¢ã§ã¯ãã¡ããä¾¿å©ã§ãã</p>
+  <p>è¨­å®ç»é¢ããã¯ã³ã¿ããã§åãæ¿ããããã®ã§ãå ´é¢ã«å¿ãã¦ä½¿ãåãã¦ãã ããã</p>
+
+  <h2>v2.1 ã®æ°æ©è½</h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">ð</div>
+      <h4>Bridge Send â æ¥âè±ç¿»è¨³éä¿¡</h4>
+      <p>æ¥æ¬èªã§è©±ããåå®¹ãããã®å ´ã§è±èªã«ç¿»è¨³ãã¦éä¿¡ãåæã¨è¨³æã2ãã¤ã³ã®ãªã¼ãã¼ã¬ã¤ã§ç¢ºèªã»ç·¨éã§ããããªã»ããåæ¿ï¼<kbd>â</kbd><kbd>â¥</kbd><kbd>P</kbd>ï¼ã§ãEN-MailããEN-Chatããªã©ç¨éã«å¿ããç¿»è¨³ã¹ã¿ã¤ã«ãé¸æå¯è½ãç¿»è¨³ã«ã¯ Apple Translation framework ãä½¿ç¨ï¼macOS 15+ããªãã©ã¤ã³å¯¾å¿ï¼ã</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">â¡</div>
+      <h4>Quick Translate â é¸æãã­ã¹ãç¿»è¨³</h4>
+      <p>ãã­ã¹ããé¸æãã¦ <kbd>â</kbd><kbd>â¥</kbd><kbd>T</kbd> ãæ¼ãã ãããã©ã¦ã¶ã§ãã¡ã¼ã«ã§ãã¨ãã£ã¿ã§ããé¸æãã­ã¹ããæ¥âè±ã§å³æç¿»è¨³è¡¨ç¤ºãã¾ããBridge Send ããè©±ãã¦ç¿»è¨³ããªããQuick Translate ã¯ãé¸ãã§ç¿»è¨³ãã§ãã</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">ð</div>
+      <h4>ç¨èªéï¼Glossaryï¼</h4>
+      <p>ãã­ã¸ã§ã¯ããã¨ã«å°éç¨èªã¨è¨³èªã®ãã¢ãç»é²ãã¦ããã¨ãç¿»è¨³æã«èªååæ ãç¤¾åç¨èªãæè¡ç¨èªã®è¨³èªãçµ±ä¸ã§ãã¾ãã</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">â¨ï¸</div>
+      <h4>ã·ã§ã¼ãã«ããã«ã¹ã¿ãã¤ãº</h4>
+      <p>é²é³éå§ã»åæ­¢ãBridge SendãQuick Translateãããªã»ããåæ¿ãªã©ä¸»è¦ãªæä½ã®ã­ã¼ãã¤ã³ããèªç±ã«å¤æ´å¯è½ãè¨­å®ã¯åèµ·åå¾ãä¿æããã¾ãã</p>
+    </div>
+  </div>
+
+  <h2>é³å£°ã³ãã³ãã§ Markdown å¥å</h2>
+  <p>VoiceNote ã§ã¯ãå£°ã ãã§ Markdown è¨æ³ãå¥åã§ãã¾ãã</p>
+  <p>ãè¦åºããã¨è¨ãã° <code>## </code> ãããå¤§è¦åºãããªã <code># </code> ãå¥åããã¾ãããé ç®ãã§ç®æ¡æ¸ãã® <code>- </code> ãããæ¹è¡ãã§æ¹è¡ãå¥ãã¾ãããå¤ªå­ãããã¼ã«ããã§ <code>**</code> ãæ¿å¥ããããªããå¤æ°ã®é³å£°ã³ãã³ãã«å¯¾å¿ãã¦ãã¾ãã</p>
+  <p>è­°äºé²ãã¡ã¢ãå£°ã§åãã¨ããæ§é åããã Markdown ãã­ã¥ã¡ã³ãããã³ãºããªã¼ã§ä½æã§ããã®ãå¤§ããªç¹å¾´ã§ãã</p>
+
+  <h2>ã¢ããªå¥ãã­ãã¡ã¤ã«</h2>
+  <p>VoiceNote ã¯ã¢ã¯ãã£ããªã¢ããªãæ¤ç¥ãã¦ãåºåãã©ã¼ããããèªåèª¿æ´ãã¾ãã</p>
+  <p>Slack ã Discord ã«ãã¼ã¹ãããå ´åã¯ Markdown è¨æ³ãé¤å»ãããã¬ã¼ã³ãã­ã¹ãã§åºåãVSCode ã Xcode ã§ã¯ã³ã¼ãå¥åã«é©ããã¤ã³ãã³ãèª¿æ´ãè¡ãã¾ããã¢ããªãã¨ã«æ«å°¾æ¹è¡ã®è¿½å æç¡ãªã©ãç´°ããå¶å¾¡ããã¦ãã¾ãã</p>
+  <p>ãã©ã®ã¢ããªã§ä½¿ã£ã¦ãéåæãªãå¥åã§ããããç®æããæ©è½ã§ãã</p>
+
+  <h2>Gemini API é£æºï¼BYO APIï¼</h2>
+  <div class="api-note">
+    <strong>ð§ ãªãã·ã§ã³æ©è½</strong> â è¨­å®ç»é¢ãã Gemini API ã­ã¼ãç»é²ããã¨ãä»¥ä¸ã®æ©è½ãå¼·åããã¾ããæªè¨­å®ã§ãé³å£°å¥åã»ç¿»è¨³ã®åºæ¬æ©è½ã¯ãã¹ã¦ãªã³ããã¤ã¹ã§åä½ãã¾ãã
+  </div>
+  <h3>ãã­ã¹ãæ´å½¢</h3>
+  <p>é³å£°æ¸ãèµ·ããå¾ã®ãã­ã¹ãããGeminiï¼gemini-2.0-flashï¼ãèªåæ´å½¢ãã¾ãããã£ã©ã¼ï¼ãã¼ããã®ã¼ç­ï¼ã®é¤å»ãå¥èª­ç¹ã®è£æ­£ãé·æã®å ´åã¯è¦åºããç®æ¡æ¸ãã§ã®æ§é åã¾ã§è¡ãã¾ããè©±ãè¨èã®ãã¥ã¢ã³ã¹ã¯æ®ãã¤ã¤ãAI ãã£ããã¸ã®å¥åã«é©ããå½¢ã«æ´ãã¦ããã¾ãã</p>
+  <h3>Bridge Send ã®æä½èª¿æ´</h3>
+  <p>ããªã»ããï¼EN-MailãEN-Chat ç­ï¼ãé¸ãã éã«ãç¿»è¨³å¾ã®è±æãããªã»ããã«å¿ãããã¼ã³ã«èªåèª¿æ´ãã¾ãã</p>
+
+  <h2>ãã¼ã¯ã³ä¿è­·</h2>
+  <p>Bridge Send ã Quick Translate ã§ç¿»è¨³ããéãURLãã¡ã¼ã«ã¢ãã¬ã¹ãã³ã¼ããã­ãã¯ããã¡ã¤ã«ãã¹ãã³ãã³ãï¼$ ã§å§ã¾ãè¡ï¼ããã¼ã¸ã§ã³çªå·ã Git ããã·ã¥ãªã©ãèªåçã«ãã¬ã¼ã¹ãã«ãã§ä¿è­·ããç¿»è¨³å¾ã«å¾©åãã¾ãã</p>
+  <p>æè¡çãªåå®¹ãç¿»è¨³ããã¨ããURL ãå´©ãããã³ã¼ããæå³ä¸æã«ç¿»è¨³ããããããåé¡ãé²ãã¾ããä¿è­·å¯¾è±¡ã¯è¨­å®ç»é¢ããåå¥ã«ãªã³ã»ãªãã§ãã¾ãã</p>
+
+  <h2>ãããªå ´é¢ã§ä½¿ãã¾ã</h2>
+
+  <div class="use-case">
+    <h4>ð¬ AI ãã£ããã¸ã®ãã­ã³ããå¥å</h4>
+    <p>ChatGPT ã Claude ã«ãã­ã³ãããæã¡è¾¼ãä»£ããã«ãèãã¦ãããã¨ããã®ã¾ã¾è©±ããé·æãã­ã³ãããã¹ãã¬ã¹ããªã¼ã«å¥åã§ãã¾ãã</p>
+  </div>
+  <div class="use-case">
+    <h4>ð§ è±èªã¡ã¼ã«ã®ä½æ</h4>
+    <p>æ¥æ¬èªã§åå®¹ãè©±ããBridge Send ã§è±èªã«ç¿»è¨³ãããªã»ããããEN-Mailãã«åãæ¿ããã°ããã¸ãã¹ã¡ã¼ã«åãã®ãã¼ã³ã§ç¿»è¨³ããã¾ãã</p>
+  </div>
+  <div class="use-case">
+    <h4>ð è­°äºé²ã»ã¡ã¢ã®é«éå¥å</h4>
+    <p>ä¼è­°ä¸­ã«ãªã¢ã«ã¿ã¤ã ã§ã¡ã¢ãåããé³å£°ã³ãã³ãã§è¦åºããç®æ¡æ¸ãã® Markdown è¨æ³ãå¥åå¯è½ã§ãã</p>
+  </div>
+  <div class="use-case">
+    <h4>ð» ã³ã¼ãã£ã³ã°ä¸­ã®ãã­ã¥ã¡ã³ãå¥å</h4>
+    <p>Xcode ã VSCode ã§ã³ã¼ããæ¸ããªãããã³ã¡ã³ãããã­ã¥ã¡ã³ããå£°ã§å¥åãã¢ããªå¥ãã­ãã¡ã¤ã«ã§ãã©ã¼ããããèªåèª¿æ´ããã¾ãã</p>
+  </div>
+
+  <div class="privacy-note">
+    ð <strong>ãã©ã¤ãã·ã¼éè¦</strong> â é³å£°ãã¼ã¿ã¯ãã¹ã¦ããã¤ã¹ä¸ã§å¦çããã¾ããWhisper ã Apple Translation framework ãå®å¨ãªã³ããã¤ã¹ãé³å£°ãå¤é¨ãµã¼ãã¼ã«éããããã¨ã¯ããã¾ãããå¯ä¸ã®ä¾å¤ã¯ Gemini API ã­ã¼ãè¨­å®ããå ´åã®ãã­ã¹ãæ´å½¢ã»æä½èª¿æ´ã§ããã®å ´åã®ã¿æ¸ãèµ·ããå¾ã®ãã­ã¹ãï¼é³å£°ãã¼ã¿ã§ã¯ãªãæå­ãã¼ã¼ï¼ã Gemini API ã«éä¿¡ããã¾ãã
+  </div>
+
+  <h2>åä½ç°å¢</h2>
+  <table class="spec-table">
+    <tr><th>OS</th><td>macOS 14 (Sonoma) ä»¥é â» Bridge Send / Quick Translate ã¯ macOS 15+</td></tr>
+    <tr><th>ããã</th><td>Apple Silicon (M1 / M2 / M3 / M4) æ¨å¥¨</td></tr>
+    <tr><th>ã¹ãã¬ã¼ã¸</th><td>Whisper ã¢ã¼ãä½¿ç¨æ: ç´3GBã®ç©ºãï¼ã¢ãã«ååãã¦ã³ã­ã¼ãï¼</td></tr>
+    <tr><th>å¿è¦ãªæ¨©é</th><td>ã¢ã¯ã»ã·ããªãã£ããã¤ã¯ãé³å£°èªè­</td></tr>
+  </table>
+
+  <div class="warning-box">
+    <strong>â ï¸ ç½²åã«é¢ãããæ³¨æ</strong><br>
+    æ¬ã¢ããªã¯ Apple Developer Program æªç»é²ï¼ã¢ãããã¯ç½²åï¼ã§éå¸ãã¦ãã¾ããååèµ·åæã«ãéçºåãç¢ºèªã§ãã¾ãããã¨ããè­¦åãè¡¨ç¤ºããã¾ããã·ã¹ãã è¨­å® > ãã©ã¤ãã·ã¼ã¨ã»ã­ã¥ãªãã£ > ããã®ã¾ã¾éããã§èµ·åã§ãã¾ãã
+  </div>
+
+  <div class="bottom-cta">
+    <h2>VoiceNote v2.1</h2>
+    <p>macOS ã®é³å£°å¥åããã£ã¨ä¾¿å©ã«ããã£ã¨å®ç¨çã«ã</p>
+    <a class="cta-btn" href="https://fukudafukuo.booth.pm/items/8005996" style="margin-top:16px;">BOOTHã§è³¼å¥ãã â Â¥300</a>
+  </div>
+
+</article>
+
+<footer>
+  <p>éçº: <a href="https://underbar.tokyo">underbar.tokyo</a></p>
+</footer>
+
+</body>
+</html>
+

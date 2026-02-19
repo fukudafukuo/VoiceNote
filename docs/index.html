@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceNote v2.1 リリース — macOS で「声」を最強の入力手段に | Whisper音声入力 & 日英翻訳アプリ</title>
+<meta name="description" content="VoiceNote は macOS メニューバー常駐の音声入力アプリ。Whisper Large V3 Turbo によるオンデバイス竘精度書き起こし、Bridge Send による日→英リアルタイム翻訳、Quick Translate、音声コマンドでMarkdown入力、Gemini API連携など全機能を紹介。">
+<meta name="keywords" content="VoiceNote, macOS, 音声入力, Whisper, WhisperKit, Apple Silicon, 音声認識, 翻訳, Bridge Send, Quick Translate, Markdown, Gemini API, オンデバイス, メニューバー, 個人開発">
+<meta property="og:title" content="VoiceNote v2.1 — macOS で「声」を最強の入力手段に">
+<meta property="og:description" content="ショートカットキー一発で録音→書き起こし→自動ペースト。Whisper オンデバイス認識で高精度。日→英翻訳送信、選択テキスト翻訳、音声Markdown入力にも対応。">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VoiceNote v2.1 — macOS で「声」を最強の入力手段に">
+<meta name="twitter:description" content="ショートカットキー一発で録音→書き起こし→自動ペースト。Whisper オンデバイス認識で高精度。¥300で販売中。">
+<link rel="canonical" href="https://fukudafukuo.github.io/voicenote/">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    color: #1a1a1a;
+    background: #fafafa;
+    line-height: 1.85;
+  }
+  .hero {
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #2d1b69 100%);
+    color: #fff;
+    padding: 80px 24px 60px;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 800;
+    line-height: 1.3;
+    margin-bottom: 16px;
+  }
+  .hero p {
+    font-size: 17px;
+    opacity: 0.85;
+    max-width: 600px;
+    margin: 0 auto 32px;
+  }
+  .cta-btn {
+    display: inline-block;
+    background: #ff4654;
+    color: #fff;
+    text-decoration: none;
+    padding: 14px 36px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255,70,84,0.35);
+  }
+  .price-tag {
+    display: inline-block;
+    margin-left: 12px;
+    background: rgba(255,255,255,0.2);
+    padding: 14px 24px;
+    border-radius: 8px;
+    font-size: 22px;
+    font-weight: 800;
+    vertical-align: middle;
+  }
+  article {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+  h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #2d1b69;
+  }
+  h3 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 32px 0 10px;
+    color: #2d1b69;
+  }
+  p { margin-bottom: 16px; }
+  .lead {
+    font-size: 18px;
+    color: #444;
+    border-left: 4px solid #2d1b69;
+    padding-left: 16px;
+    margin: 32px 0;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 24px 0;
+  }
+  .feature-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 24px;
+    transition: box-shadow 0.2s;
+  }
+  .feature-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .feature-card .icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .feature-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .feature-card p {
+    font-size: 14px;
+    color: #555;
+    margin: 0;
+  }
+  .use-case {
+    background: #f0eef5;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .use-case h4 {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .use-case p {
+    font-size: 15px;
+    color: #444;
+    margin: 0;
+  }
+  .warning-box {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+  }
+  .warning-box strong { color: #e65100; }
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .spec-table th, .spec-table td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 15px;
+  }
+  .spec-table th {
+    background: #f5f5f5;
+    font-weight: 600;
+    width: 30%;
+  }
+  .bottom-cta {
+    text-align: center;
+    padding: 48px 24px;
+    background: #f0eef5;
+    border-radius: 16px;
+    margin: 48px 0 0;
+  }
+  .bottom-cta h2 {
+    border: none;
+    margin-top: 0;
+  }
+  kbd {
+    background: #eee;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 13px;
+    font-family: monospace;
+  }
+  .privacy-note {
+    background: #e8f5e9;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    font-size: 15px;
+  }
+  .api-note {
+    background: #e3f2fd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    font-size: 15px;
+  }
+  code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+  }
+  footer {
+    text-align: center;
+    padding: 32px 24px;
+    color: #888;
+    font-size: 14px;
+  }
+  footer a { color: #2d1b69; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">NEW RELEASE — v2.1</div>
+  <h1>VoiceNote<br>macOS で「声」を最強の入力手段に</h1>
+  <p>ショートカットキー一発で録音。Whisper が高精度に書き起こし、そのまま翻訳して英語で送信。すべてメニューバーから。</p>
+  <a class="cta-btn" href="https://fukudafukuo.booth.pm/items/8005996">BOOTHで購入する</a>
+  <span class="price-tag">¥300</span>
+</div>
+
+<article>
+
+  <p class="lead">キーボードで打つより、声で話すほうが速い。そんな当たり前のことを、macOS で実現するアプリを作りました。この記事では VoiceNote v2.1 の全機能を紹介します。</p>
+
+  <h2>VoiceNote とは</h2>
+  <p>VoiceNote は macOS のメニューバーに常駐する音声入力アプリです。右⌘キーを2回タップするだけで録音が始まり、話した内容をテキストに変換してアクティブなアプリに自動ペーストします。</p>
+
+  <h2>2つの認識エンジンを切替可能</h2>
+  <p>VoiceNote には2つの音声認識エンジンを搭載しており、用途に応じて切り替えられます。</p>
+
+  <h3>Whisper（高精度モード）</h3>
+  <p>OpenAI の <strong>Whisper Large V3 Turbo</strong> を <strong>WhisperKit</strong> 経由で Apple Silicon 上にオンデバイス実行。専門用語や英単語が混じった内容も高い精度で認識します。ただしモデルが大きいため、処理にはやや時間がかかります。初回使用時に約3GBのモデルをダウンロードする必要があります。精度を重視したい場面に向いています。</p>
+
+  <h3>Apple 音声認識（高速モード）</h3>
+  <p>macOS 内蔵のオンデバイス音声認識を使用。モデルのダウンロードが不要で、Whisper に比べて処理が高速です。短いメモやチャット入力など、速度を重視したい場面ではこちらが便利です。</p>
+  <p>設定画面からワンタッチで切り替えられるので、場面に応じて使い分けてください。</p>
+
+  <h2>v2.1 の新機能</h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">🌐</div>
+      <h4>Bridge Send — 日→英翻訳送信</h4>
+      <p>日本語で話した内容を、その場で英語に翻訳して送信。原文と訳文を2ペインのオーバーレイで確認・編集でき、プリセット切替（<kbd>⌃</kbd><kbd>⌥</kbd><kbd>P</kbd>）で「EN-Mail」「EN-Chat」など用途に応じた翻訳スタイルを選択可能。翻訳には Apple Translation framework を使用（macOS 15+、オフライン対応）。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⚡</div>
+      <h4>Quick Translate — 選択テキスト翻訳</h4>
+      <p>テキストを選択して <kbd>⌃</kbd><kbd>⌥</kbd><kbd>T</kbd> を押すだけ。ブラウザでもメールでもエディタでも、選択テキストを日↔英で即時翻訳表示します。Bridge Send が「話して翻訳」なら、Quick Translate は「選んで翻訳」です。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📖</div>
+      <h4>用語集（Glossary）</h4>
+      <p>プロジェクトごとに専門用語と訳語のペアを登録しておくと、翻訳時に自動反映。社内用語や技術用語の訳語を統一できます。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⌨️</div>
+      <h4>ショートカットカスタマイズ</h4>
+      <p>録音開始・停止、Bridge Send、Quick Translate、プリセット切替など主要な操作のキーバインドを自由に変更可能。設定は再起動後も保持されます。</p>
+    </div>
+  </div>
+
+  <h2>音声コマンドで Markdown 入力</h2>
+  <p>VoiceNote では、声だけで Markdown 記法を入力できます。</p>
+  <p>「見出し」と言えば <code>## </code> が、「大見出し」なら <code># </code> が入力されます。「項目」で箇条書きの <code>- </code> が、「改行」で改行が入ります。「太字」「ボールド」で <code>**</code> が挿入されるなど、多数の音声コマンドに対応しています。</p>
+  <p>議事録やメモを声で取るとき、構造化された Markdown ドキュメントをハンズフリーで作成できるのが大きな特徴です。</p>
+
+  <h2>アプリルプロファイル</h2>
+  <p>VoiceNote はアクティブなアプリを検知して　出力フォーマットを自動調整します。</p>
+  <p>Slack や Discord にペーストする場合は Markdown 記法を除去したプレーンテキストで出力。VSCode や Xcode ではコード入力に適したインデント調整を行います。アプリごとに末尾改行の追加有無なども細かく制御されています。</p>
+  <p>「どのアプリで使っても違和感なく入力できる」を目指した機能です。</p>
+
+  <h2>Gemini API 連携（BYO API）</h2>
+  <div class="api-note">
+    <strong>🔧 オプション機能</strong> — 設定画面から Gemini API キーを登録すると、以下の機能が強化されます。未設定でも音声入力・翻訳の基本機能はすべてオンデバイスで動作します。
+  </div>
+  <h3>テキスト整形</h3>
+  <p>音声書き起こ後のテキストを、Gemini（gemini-2.0-flash）が自動整形します。フィラー（えー、あのー等）の除去、句読点の補正、長文の場合は見出しや管条書きでの構造化まで行います。話し言葉のニュアンスは残しつつ、AI チャットへの入力に適した形に整えてくれます。</p>
+  <h3>Bridge Send の文体調整</h3>
+  <p>プリセット（EN-Mail、EN-Chat 等）を選んだ際に、翻訳後の英文をプリセットに応じたトーンに自動調整します。</p>
+
+  <h2>トークン保護</h2>
+  <p>Bridge Send や Quick Translate で翻訳する際、URL、メールアドレス、コードブロック、ファイルパス、コマンド（$ で始まる行）、バージョン番号や Git ハッシュなどを自動的にプレースホルダで保護し、翻訳後に復元します。</p>
+  <p>技術的な内容を翻訳するとき、URL が崩れたりコードが意味不明に翻訳されたりする問題を防ぎます。保護対象は設定画面から個別にオン・オフできます。</p>
+
+  <h2>こんな場面で使えます</h2>
+
+  <div class="use-case">
+    <h4>💬 AI チャットへのプロンプト入力</h4>
+    <p>ChatGPT や Claude にプロンプトを打ち込む代わりに、考えていることをそのまま話す。長文プロンプトもストレスフリーに入力できます。</p>
+  </div>
+  <div class="use-case">
+    <h4>📧 英語メールの作成</h4>
+    <p>日本語で内容を話し、Bridge Send で英語に翻訳。プリセットを「EN-Mail」に切り替えれば、ビジネスメール向けのトーンで翻訳されます。</p>
+  </div>
+  <div class="use-case">
+    <h4>📝 議事録・メモの高速入力</h4>
+    <p>会議中にリアルタイムでメモを取る。音声コマンドで見出しや管条書きの Markdown 記法も入力可能です。</p>
+  </div>
+  <div class="use-case">
+    <h4>💻 コーディング中のドキュメント入力</h4>
+    <p>Xcode や VSCode でコードを書きながら、コメントやドキュメントを声で入力。アプリ別プロファイルでフォーマットが自動調整されます。</p>
+  </div>
+
+  <div class="privacy-note">
+    🔒 <strong>プライバシー重視</strong> — 音声データはすべてデバイス《で処理されます。Whisper も Apple Translation framework も完全オンデバイス。音声が外部サーバーに送られることはありません。唯一の例外は Gemini API キーを設定した場合のテキスト整形・文体調整で、この場合のみ書き起こし後のテキスト（音声データではなく文字データ）が Gemini API に送信されます。
+  </div>
+
+  <h2>動作環境电尾</h2>
+  <table class="spec-table">
+    <tr><th>OS</th><td>macOS 14 (Sonoma) 以降 ※ Bridge Send / Quick Translate は macOS 15+</td></tr>
+    <tr><th>チップ</th><td>Apple Silicon (M1 / M2 / M3 / M4) 推奨</td></tr>
+    <tr><th>ストレージ</th><td>Whisper モード使用時: 約3GBの空き（モデル初回ダウンロード）</td></tr>
+    <tr><th>必要な権限</th><td>アクセシビリティ、マイク、音声認識</td></tr>
+  </table>
+
+  <div class="warning-box">
+    <strong>⚠️ 署名に関するご注意</strong><br>
+    本アプリは Apple Developer Program 未登録（アドホック署名）で配布しています。初回起動時に「開発元を確認できません」という警告が表示されます。システム設定 > プライバシーとセキュリティ > 「このまま開く」で起動できます。
+  </div>
+
+  <div class="bottom-cta">
+    <h2>VoiceNote v2.1</h2>
+    <p>macOS の音声入力をもっと便利に、もっと実用的に。</p>
+    <a class="cta-btn" href="https://fukudafukuo.booth.pm/items/8005996" style="margin-top:16px;">BOOTHで購入する — ¥300</a>
+  </div>
+
+</article>
+
+<footer>
+  <p>開発: <a href="https://underbar.tokyo">underbar.tokyo</a></p>
+</footer>
+
+</body>
+</html>
